@@ -4,55 +4,46 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct Row {
-    employee: Employee,
-    payor: Payor,
-    payee: Payee,
-    amount: String,
+    pub employee: Employee,
+    pub payor: Payor,
+    pub payee: Payee,
+    pub amount: String,
 }
 
-// impl Row {
-//     fn to_csv(&self) -> Result<String, Box<dyn std::error::Error>> {
-//         let mut wtr = csv::Writer::from_writer(Vec::new());
-//         wtr.serialize(self)?;
-//         let data = String::from_utf8(wtr.into_inner()?)?;
-//         Ok(data)
-//     }
-// }
-
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct Employee {
-    dunkin_id: String,
-    dunkin_branch: String,
-    first_name: String,
-    last_name: String,
+    pub dunkin_id: String,
+    pub dunkin_branch: String,
+    pub first_name: String,
+    pub last_name: String,
     #[serde(rename = "DOB")]
-    dob: String,
-    phone_number: String,
+    pub dob: String,
+    pub phone_number: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct Payor {
-    dunkin_id: String,
+    pub dunkin_id: String,
     #[serde(rename = "ABARouting")]
-    abarouting: String,
-    account_number: String,
-    name: String,
+    pub abarouting: String,
+    pub account_number: String,
+    pub name: String,
     #[serde(rename = "DBA")]
-    dba: String,
+    pub dba: String,
     #[serde(rename = "EIN")]
-    ein: String,
-    address: Address,
+    pub ein: String,
+    pub address: Address,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct Address {
-    line1: String,
-    city: String,
-    state: String,
-    zip: String,
+    pub line1: String,
+    pub city: String,
+    pub state: String,
+    pub zip: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -65,7 +56,7 @@ pub struct Payee {
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename = "root")]
 pub struct Root {
-    row: Vec<Row>,
+    pub row: Vec<Row>,
 }
 
 impl Root {
