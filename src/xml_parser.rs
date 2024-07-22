@@ -49,8 +49,9 @@ pub struct Address {
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct Payee {
-    plaid_id: String,
-    loan_account_number: String,
+    pub plaid_id: String,
+    #[serde(rename = "LoanAccountNumber")]
+    pub account_number: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

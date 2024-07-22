@@ -1,5 +1,3 @@
-use std::io::Read;
-
 use actix_multipart::{
     form::{
         bytes::Bytes,
@@ -9,8 +7,9 @@ use actix_multipart::{
     Multipart,
 };
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
-use ifdohtem::yml_parser::*;
+use ifdohtem::xml_parser::*;
 use ifdohtem::*;
+use std::io::Read;
 use tracing::{debug, info};
 
 #[derive(Debug, MultipartForm)]
@@ -29,7 +28,6 @@ async fn payouts(MultipartForm(form): MultipartForm<UploadForm>) -> impl Respond
     let mut buf = String::new();
     form.file.file.as_file().read_to_string(&mut buf).unwrap();
     let a = parse_xml(&buf).unwrap();
-    //let csv_data = pre_payouts(&a.row).await;
 
     let mut table_html = String::new();
     table_html.push_str("<table border=\"1\">");
@@ -50,14 +48,14 @@ async fn payouts(MultipartForm(form): MultipartForm<UploadForm>) -> impl Respond
     }
     table_html.push_str("</table>");
 
-    //let tmpfile_path = form.file.file.path().as_os_str().to_str().unwrap();
     let new_path = format!(
-        "{:?}/tmp/{:?}",
-        std::env::current_dir().unwrap(),
+        "{}/tmp/{}",
+        std::env::current_dir().unwrap().to_str().unwrap(),
         uuid::Uuid::new_v4(),
     );
+    info!("saving file to {}", new_path);
     form.file.file.persist(new_path.clone()).unwrap();
-    debug!("save file to {}", new_path);
+    info!("saved file to {}", new_path);
 
     HttpResponse::Ok().content_type("text/html").body(format!(
         r#"<!DOCTYPE html>
@@ -105,14 +103,73 @@ async fn confim_payment(form: web::Form<ConfirmForm>) -> impl Responder {
         .read_to_string(&mut buf)
         .unwrap();
 
-    HttpResponse::Ok().body("hello")
+    // parse xml
+    let a = parse_xml(&buf).unwrap();
+
+    match payouts_call(a.row).await {
+        Ok(Reports(a, b, c)) => {
+            let id = uuid::Uuid::new_v4();
+            let a_path = format!(
+                "{}/tmp/{}_a.csv",
+                std::env::current_dir().unwrap().to_str().unwrap(),
+                id,
+            );
+
+            let b_path = format!(
+                "{}/tmp/{}_b.csv",
+                std::env::current_dir().unwrap().to_str().unwrap(),
+                id,
+            );
+
+            let c_path = format!(
+                "{}/tmp/{}_c.csv",
+                std::env::current_dir().unwrap().to_str().unwrap(),
+                id,
+            );
+
+            save_btreemap_to_csv(&a_path, &a).unwrap();
+            save_btreemap_to_csv(&b_path, &b).unwrap();
+            save_vec_to_csv(&c_path, &c).unwrap();
+
+            HttpResponse::Ok().content_type("text/html").body(format!(
+                r#"
+        <html>
+            <body>
+                <button onclick="window.location.href='/download/{id}_a.csv';">Download Report1</button>
+                <button onclick="window.location.href='/download/{id}_b.csv';">Download Report2</button>
+                <button onclick="window.location.href='/download/{id}_c.csv';">Download Report3</button>
+            </body>
+        </html>
+        "#,
+            ))
+        }
+        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
+    }
 }
 
 #[post("/payouts/cancel_payment")]
 async fn cancel_payment(form: web::Form<ConfirmForm>) -> impl Responder {
     let tmpfile_path = &form.tmpfile_path;
     std::fs::remove_file(&tmpfile_path).unwrap();
+    info!("deleted file to {}", tmpfile_path);
     HttpResponse::Ok().body("Payment cancelled")
+}
+
+#[get("/download/{filename}")]
+async fn download(path: web::Path<String>) -> impl Responder {
+    let filename = path.into_inner();
+    let file_path = format!("/tmp/{}", filename);
+
+    match std::fs::read(&file_path) {
+        Ok(data) => HttpResponse::Ok()
+            .content_type("text/csv")
+            .insert_header((
+                "Content-Disposition",
+                format!("attachment; filename=\"{}\"", filename),
+            ))
+            .body(data),
+        Err(_) => HttpResponse::NotFound().body("File not found"),
+    }
 }
 
 #[actix_web::main]
@@ -131,6 +188,7 @@ async fn main() -> std::io::Result<()> {
             .service(index)
             .service(confim_payment)
             .service(cancel_payment)
+            .service(download)
     })
     .bind(("127.0.0.1", 8080))?
     .run()
